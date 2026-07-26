@@ -1,0 +1,95 @@
+name: Rekor v2 public-good test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sign-and-verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Create test subject
+        run: |
+          jq -n \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg commit "${GITHUB_SHA}" \
+            --arg workflow_ref "${GITHUB_WORKFLOW_REF}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            '{
+              purpose: "Rekor v2 public-good instance test",
+              repository: $repository,
+              commit: $commit,
+              workflowRef: $workflow_ref,
+              runId: $run_id,
+              runAttempt: $run_attempt
+            }' > rekor-v2-test-subject.json
+
+      - name: Load the TUF-distributed Rekor v2 signing configuration
+        run: |
+          cosign signing-config create \
+            --with-default-rekor-v2 \
+            --out signing-config.json
+
+          jq -e '
+            .rekorTlogUrls
+            | map(select(.majorApiVersion == 2))
+            | length > 0
+          ' signing-config.json
+
+          jq '{rekorTlogUrls, rekorTlogConfig}' signing-config.json
+
+      - name: Sign the subject and upload the entry to Rekor v2
+        run: |
+          cosign sign-blob \
+            --yes \
+            --signing-config signing-config.json \
+            --bundle rekor-v2-test.sigstore.json \
+            rekor-v2-test-subject.json
+
+      - name: Verify the bundle and GitHub Actions identity
+        run: |
+          expected_identity="${GITHUB_SERVER_URL}/${GITHUB_WORKFLOW_REF}"
+
+          cosign verify-blob \
+            --bundle rekor-v2-test.sigstore.json \
+            --certificate-identity "${expected_identity}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            rekor-v2-test-subject.json
+
+      - name: Show transparency-log evidence
+        run: |
+          jq -e '.verificationMaterial.tlogEntries | length > 0' \
+            rekor-v2-test.sigstore.json
+
+          jq '.verificationMaterial.tlogEntries[] | {
+            logIndex,
+            integratedTime,
+            logId,
+            inclusionPromise,
+            inclusionProof
+          }' rekor-v2-test.sigstore.json
+
+      - name: Upload verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: rekor-v2-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            rekor-v2-test-subject.json
+            rekor-v2-test.sigstore.json
+            signing-config.json
+          if-no-files-found: error
+          retention-days: 30
