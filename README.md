@@ -46,3 +46,6 @@ verification, and the verified results from run `30183326061`.
 The evidence downloaded from that run is also preserved under
 [`evidence/run-30183326061`](evidence/run-30183326061), so it remains verifiable
 after the GitHub Actions artifact expires.
+
+The rationale for using the official Cosign CLI instead of an all-in-one
+signing action is documented in [docs/append.md](docs/append.md).
