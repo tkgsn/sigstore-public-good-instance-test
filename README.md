@@ -42,3 +42,7 @@ to Rekor.
 See [docs/verification.md](docs/verification.md) for GitHub authentication and
 artifact-download instructions, independent inclusion-proof/root-hash
 verification, and the verified results from run `30183326061`.
+
+The evidence downloaded from that run is also preserved under
+[`evidence/run-30183326061`](evidence/run-30183326061), so it remains verifiable
+after the GitHub Actions artifact expires.

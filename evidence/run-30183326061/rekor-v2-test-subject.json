@@ -1,0 +1,8 @@
+{
+  "purpose": "Rekor v2 public-good instance test",
+  "repository": "tkgsn/sigstore-public-good-instance-test",
+  "commit": "3069fcd0c32873ef580c02e20e955cdb776b1f4a",
+  "workflowRef": "tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main",
+  "runId": "30183326061",
+  "runAttempt": "1"
+}

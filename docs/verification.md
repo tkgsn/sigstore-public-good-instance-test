@@ -39,12 +39,22 @@ gh run download 30183326061 \
 GitHub requires authentication even when downloading Actions artifacts from a
 public repository.
 
+The files downloaded from this run are also committed at
+[`evidence/run-30183326061`](../evidence/run-30183326061). They are public
+verification material and contain no GitHub credential or private signing key.
+
 ## 2. Run all verifications
 
 Requirements are Cosign 3.1.2 or newer, Go, and `jq`.
 
 ```shell
 ./scripts/verify_evidence.sh evidence-30183326061
+```
+
+To verify the copy preserved in this repository instead, run:
+
+```shell
+./scripts/verify_evidence.sh evidence/run-30183326061
 ```
 
 The script obtains the Sigstore TrustedRoot through TUF, then performs two
