@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rekor v2 Append &amp; Verify</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-2: #eef2f6;
+      --text: #18212b;
+      --muted: #5d6976;
+      --border: #d4dbe3;
+      --accent: #0969da;
+      --accent-soft: #ddf4ff;
+      --accent-text: #0550ae;
+      --success: #1a7f37;
+      --success-soft: #dafbe1;
+      --code: #f2f4f7;
+      --shadow: 0 8px 28px rgba(31, 35, 40, 0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --surface-2: #21262d;
+        --text: #e6edf3;
+        --muted: #9da7b3;
+        --border: #30363d;
+        --accent: #58a6ff;
+        --accent-soft: #102a43;
+        --accent-text: #79c0ff;
+        --success: #3fb950;
+        --success-soft: #163522;
+        --code: #0d1117;
+        --shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 44px 0 64px;
+    }
+
+    header { margin-bottom: 28px; }
+    h1, h2, h3 { line-height: 1.25; font-weight: 500; }
+    h1 { margin: 0 0 10px; font-size: clamp(1.75rem, 4vw, 2.6rem); }
+    h2 { margin: 40px 0 16px; font-size: 1.35rem; }
+    h3 { margin: 0 0 8px; font-size: 1rem; }
+    p { margin: 0; }
+    a { color: var(--accent); }
+
+    .lead {
+      max-width: 780px;
+      color: var(--muted);
+      font-size: 1.02rem;
+    }
+
+    .tabs {
+      display: inline-flex;
+      gap: 4px;
+      margin: 8px 0 22px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+
+    .tab {
+      border: 0;
+      border-radius: 7px;
+      padding: 9px 18px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .tab:focus-visible, a:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      outline-offset: 2px;
+    }
+
+    .panel[hidden] { display: none; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .flow.verify { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .step {
+      position: relative;
+      min-height: 190px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -19px;
+      width: 16px;
+      color: var(--accent);
+      font-size: 1.35rem;
+      transform: translateY(-50%);
+      text-align: center;
+    }
+
+    .flow.verify .step:nth-child(3)::after { content: none; }
+
+    .number {
+      display: inline-grid;
+      width: 28px;
+      height: 28px;
+      margin-bottom: 14px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      font-weight: 500;
+    }
+
+    .step p { color: var(--muted); font-size: 0.91rem; }
+
+    .actor {
+      display: inline-block;
+      margin-top: 14px;
+      color: var(--accent-text);
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .evidence {
+      padding: 18px;
+      border-left: 4px solid var(--accent);
+      background: var(--surface);
+      border-radius: 8px;
+    }
+
+    .evidence p { color: var(--muted); font-size: 0.9rem; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .value {
+      display: block;
+      margin-top: 9px;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--code);
+      font-size: 0.78rem;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+
+    th, td {
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { color: var(--muted); font-weight: 500; }
+    td:first-child { white-space: nowrap; font-weight: 500; }
+
+    .result {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--border);
+    }
+
+    .metric { padding: 16px; background: var(--surface); }
+    .metric span { display: block; color: var(--muted); font-size: 0.78rem; }
+    .metric strong { display: block; margin-top: 5px; font-weight: 500; overflow-wrap: anywhere; }
+    .valid { color: var(--success); }
+
+    .note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--success-soft);
+      color: var(--text);
+    }
+
+    .links { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 28px; }
+
+    @media (max-width: 900px) {
+      .flow, .flow.verify { grid-template-columns: 1fr 1fr; }
+      .step:not(:last-child)::after { content: none; }
+      .evidence-grid { grid-template-columns: 1fr; }
+      .result { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      main { width: min(100% - 22px, 1120px); padding-top: 28px; }
+      .flow, .flow.verify, .result { grid-template-columns: 1fr; }
+      .tabs { display: flex; width: 100%; }
+      .tab { flex: 1; }
+      .step { min-height: 0; }
+      td:first-child { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Rekor v2 Append &amp; Verify</h1>
+      <p class="lead">GitHub Actionsが署名対象をRekor v2へappendし、検証者がbundleから署名者・時刻・Merkle treeへの包含を確認する流れ。</p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="表示するフロー">
+      <button class="tab" id="append-tab" type="button" role="tab" aria-selected="true" aria-controls="append-panel">Append</button>
+      <button class="tab" id="verify-tab" type="button" role="tab" aria-selected="false" aria-controls="verify-panel">Verify</button>
+    </div>
+
+    <section class="panel" id="append-panel" role="tabpanel" aria-labelledby="append-tab">
+      <div class="flow" aria-label="Rekor v2へのappendフロー">
+        <article class="step">
+          <span class="number">1</span>
+          <h3>Subjectを作る</h3>
+          <p>commit・workflow・run IDを含むJSONを署名対象として生成する。</p>
+          <span class="actor">GITHUB ACTIONS</span>
+        </article>
+        <article class="step">
+          <span class="number">2</span>
+          <h3>身元と鍵を結ぶ</h3>
+          <p>GitHub OIDCをFulcioが確認し、一時公開鍵とworkflow identityを結ぶ短期証明書を発行する。</p>
+          <span class="actor">FULCIO</span>
+        </article>
+        <article class="step">
+          <span class="number">3</span>
+          <h3>Hashを署名する</h3>
+          <p>SubjectのSHA-256を一時秘密鍵でECDSA署名し、TSAからRFC 3161 timestampを取得する。</p>
+          <span class="actor">COSIGN + TSA</span>
+        </article>
+        <article class="step">
+          <span class="number">4</span>
+          <h3>Entryを提出する</h3>
+          <p>digest・signature・Fulcio certificateを<code>hashedrekord 0.0.2</code>として提出する。</p>
+          <span class="actor">COSIGN → REKOR</span>
+        </article>
+        <article class="step">
+          <span class="number">5</span>
+          <h3>Merkle treeへappend</h3>
+          <p>Entryを追記し、log index・audit path・root hash・signed checkpointを返す。</p>
+          <span class="actor">REKOR V2</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="verify-panel" role="tabpanel" aria-labelledby="verify-tab" hidden>
+      <div class="flow verify" aria-label="Rekor v2 bundleのverifyフロー">
+        <article class="step">
+          <span class="number">1</span>
+          <h3>Subject digest</h3>
+          <p>手元のsubjectをSHA-256化し、bundleの<code>messageDigest</code>と一致するか確認する。</p>
+        </article>
+        <article class="step">
+          <span class="number">2</span>
+          <h3>Identity &amp; signature</h3>
+          <p>Fulcio chainとGitHub workflow identityを検証し、証明書の公開鍵でECDSA署名を確認する。</p>
+        </article>
+        <article class="step">
+          <span class="number">3</span>
+          <h3>Trusted time</h3>
+          <p>RFC 3161 tokenをTSA trust rootで検証し、署名がFulcio証明書の有効期間内に存在したことを確認する。</p>
+        </article>
+        <article class="step">
+          <span class="number">4</span>
+          <h3>Leaf hash</h3>
+          <p><code>SHA256(0x00 || canonicalizedBody)</code>でRekor entryのleaf hashを再計算する。</p>
+        </article>
+        <article class="step">
+          <span class="number">5</span>
+          <h3>Inclusion proof</h3>
+          <p>20個のaudit-path hashを順に合成し、checkpointに記載されたroot hashへ到達することを確認する。</p>
+        </article>
+        <article class="step">
+          <span class="number">6</span>
+          <h3>Signed checkpoint</h3>
+          <p>TUF TrustedRootのRekor Ed25519鍵でcheckpoint署名を検証し、root hashを信頼できる状態にする。</p>
+        </article>
+      </div>
+    </section>
+
+    <h2>3つのファイルの関係</h2>
+    <div class="evidence-grid">
+      <article class="evidence">
+        <h3>rekor-v2-test-subject.json</h3>
+        <p>署名対象の元データ。Rekorには本体ではなく、このファイルのdigestが登録される。</p>
+        <code class="value">SHA-256: nQWxW5dcj0y4KatMK/Jy1rCfntcv3f2IZtCMeJcIc9U=</code>
+      </article>
+      <article class="evidence">
+        <h3>rekor-v2-test.sigstore.json</h3>
+        <p>署名・証明書・timestamp・Rekor entry・inclusion proof・checkpointをまとめた検証bundle。</p>
+        <code class="value">mediaType: sigstore.bundle.v0.3</code>
+      </article>
+      <article class="evidence">
+        <h3>signing-config.json</h3>
+        <p>Cosignが署名時に使ったサービス選択。v2 shardをTUF配布設定から選ぶ。</p>
+        <code class="value">log2025-1.rekor.sigstore.dev · API v2</code>
+      </article>
+    </div>
+
+    <h2>Rekor v2 entryの中身</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>今回の値</th><th>役割</th></tr></thead>
+        <tbody>
+          <tr><td>digest</td><td><code>nQWxW5dcj0y4KatMK/Jy1rCfntcv3f2IZtCMeJcIc9U=</code></td><td>SubjectのSHA-256。Subject本体はRekorへ送らない。</td></tr>
+          <tr><td>signature</td><td><code>MEUCIQDBCNunbYfb…</code></td><td>一時秘密鍵によるdigestのECDSA署名。</td></tr>
+          <tr><td>certificate</td><td><code>PKIX ECDSA P-256</code></td><td>公開鍵とGitHub workflow identityを結び付けるFulcio証明書。</td></tr>
+          <tr><td>kind / version</td><td><code>hashedrekord / 0.0.2</code></td><td>Rekor v2のcanonical entry形式。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>実行結果</h2>
+    <div class="result">
+      <div class="metric"><span>Log index</span><strong>40335848</strong></div>
+      <div class="metric"><span>Checkpoint tree size</span><strong>40335875</strong></div>
+      <div class="metric"><span>Root hash</span><strong><code>mBopqZh02Z4I…</code></strong></div>
+      <div class="metric"><span>検証結果</span><strong class="valid">Valid</strong></div>
+    </div>
+    <p class="note">RFC 3161 timestampは2026-07-26 01:42:18 UTC（10:42:18 JST）。署名データがFulcio証明書の有効期間内に存在したことを証明する。</p>
+
+    <nav class="links" aria-label="関連資料">
+      <a href="verification.md">詳細な検証手順</a>
+      <a href="append.md">Cosign CLIを使った理由</a>
+      <a href="../evidence/run-30183326061/rekor-v2-test.sigstore.json">実際のSigstore bundle</a>
+      <a href="../.github/workflows/rekor-v2.yml">GitHub Actions workflow</a>
+    </nav>
+  </main>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+    function selectTab(selected) {
+      tabs.forEach((tab) => {
+        const active = tab === selected;
+        tab.setAttribute('aria-selected', String(active));
+        document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        const next = tabs[(index + delta + tabs.length) % tabs.length];
+        next.focus();
+        selectTab(next);
+      });
+    });
+  </script>
+</body>
+</html>

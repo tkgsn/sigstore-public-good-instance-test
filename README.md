@@ -49,3 +49,6 @@ after the GitHub Actions artifact expires.
 
 The rationale for using the official Cosign CLI instead of an all-in-one
 signing action is documented in [docs/append.md](docs/append.md).
+
+An interactive overview of the append and verification flows is available at
+[docs/append-verify.html](docs/append-verify.html).
