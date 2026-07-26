@@ -66,7 +66,7 @@ cosign signing-config create \
 
 このコマンドは、通常の`signing_config.v0.2.json`ではなく、Rekor v2用の
 `signing_config_rekor_v2.v0.2.json`をTUFから取得します。今回保存した設定は
-[`signing-config.json`](../evidence/run-30183326061/signing-config.json)で確認できます。
+[`signing-config.json`](../evidence/run-30187731233/signing-config.json)で確認できます。
 
 取得した設定を署名時に明示します。
 
@@ -105,12 +105,43 @@ hardcodeせず、`--with-default-rekor-v2`でTUF配布設定を取得してい�
 
 | 証跡 | 保存先 | 確認できること |
 | --- | --- | --- |
-| 署名対象 | [`rekor-v2-test-subject.json`](../evidence/run-30183326061/rekor-v2-test-subject.json) | 署名したcommit、workflow、run ID |
-| Sigstore bundle | [`rekor-v2-test.sigstore.json`](../evidence/run-30183326061/rekor-v2-test.sigstore.json) | 証明書、署名、timestamp、Rekor entry、inclusion proof、checkpoint |
-| SigningConfig | [`signing-config.json`](../evidence/run-30183326061/signing-config.json) | Rekor v2 endpointとAPI versionの選択 |
+| 署名対象 | [`rekor-v2-test-subject.json`](../evidence/run-30187731233/rekor-v2-test-subject.json) | 署名したcommit、workflow、run ID、テスト用SNPフィールド |
+| 仮report | [`dummy-snp-report.txt`](../evidence/run-30187731233/dummy-snp-report.txt) | 仮measurementの導出元。実際のSNP reportではない |
+| Sigstore bundle | [`rekor-v2-test.sigstore.json`](../evidence/run-30187731233/rekor-v2-test.sigstore.json) | 証明書、署名、timestamp、Rekor entry、inclusion proof、checkpoint |
+| SigningConfig | [`signing-config.json`](../evidence/run-30187731233/signing-config.json) | Rekor v2 endpointとAPI versionの選択 |
 
 これらの対応関係と検証方法は
 [`verification.md`](verification.md)に記載しています。
+
+## 仮SNP measurementを追加した今回のsubject
+
+run `30187731233`では、データの流れを確認するため、Workflowが
+`dummy-snp-report.txt`のSHA-256とSHA-384を計算し、署名前のsubjectへ次の形で
+格納しています。
+
+```json
+{
+  "snp": {
+    "mode": "placeholder",
+    "reportSha256": "cf0dd6d26c8a9be7e156532b1a0c684ee8e4bd1a6595ce031ef936577319c741",
+    "measurement": {
+      "algorithm": "sha384",
+      "value": "951b09434b6674c0ea5d2b20512ce008513f05b02dfe66f54e81ecc0ca134801181b638e8c0d9dcf1d2568a37247c5d8"
+    },
+    "verification": {
+      "result": "test-only"
+    }
+  }
+}
+```
+
+このJSON全体のSHA-256 digestが署名され、Rekor entryへ入ります。Rekorが
+`snp.measurement.value`を個別フィールドとして解釈・検証するわけではありません。
+検証者はsubject、bundle、仮reportを一緒に取得し、まずbundleに対するsubjectの
+署名を検証し、次に仮reportから計算した値がsubject内の値と一致することを確認します。
+
+ここでの値はAMD SEV-SNP attestationから取得したmeasurementではありません。
+`mode: placeholder`と`result: test-only`はその区別を明示するためのものです。
 
 ## 使い分け
 

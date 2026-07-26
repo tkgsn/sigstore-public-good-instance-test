@@ -13,6 +13,8 @@ to the Rekor v2 Public Good Instance.
 The artifact contains:
 
 - `rekor-v2-test-subject.json`: the signed test subject.
+- `dummy-snp-report.txt`: a clearly marked test-only input used to derive the
+  placeholder SNP fields in the signed subject.
 - `rekor-v2-test.sigstore.json`: the Sigstore bundle, including the Rekor
   transparency-log evidence.
 - `signing-config.json`: the TUF-distributed service configuration used for
@@ -41,11 +43,16 @@ to Rekor.
 
 See [docs/verification.md](docs/verification.md) for GitHub authentication and
 artifact-download instructions, independent inclusion-proof/root-hash
-verification, and the verified results from run `30183326061`.
+verification, placeholder measurement checks, and the verified results from run
+`30187731233`.
 
 The evidence downloaded from that run is also preserved under
-[`evidence/run-30183326061`](evidence/run-30183326061), so it remains verifiable
+[`evidence/run-30187731233`](evidence/run-30187731233), so it remains verifiable
 after the GitHub Actions artifact expires.
+
+The `snp` object in this run is deliberately synthetic. `placeholder` and
+`test-only` mean that it demonstrates how measurement data can be included in a
+signed subject; it is not a verified AMD SEV-SNP attestation report.
 
 The rationale for using the official Cosign CLI instead of an all-in-one
 signing action is documented in [docs/append.md](docs/append.md).

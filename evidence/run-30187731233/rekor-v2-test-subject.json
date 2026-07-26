@@ -1,0 +1,20 @@
+{
+  "purpose": "Rekor v2 placeholder SNP measurement test",
+  "repository": "tkgsn/sigstore-public-good-instance-test",
+  "commit": "ebc8552ffa6afc2fa4396a21615da315204c62ec",
+  "workflowRef": "tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main",
+  "runId": "30187731233",
+  "runAttempt": "1",
+  "snp": {
+    "mode": "placeholder",
+    "reportSha256": "cf0dd6d26c8a9be7e156532b1a0c684ee8e4bd1a6595ce031ef936577319c741",
+    "measurement": {
+      "algorithm": "sha384",
+      "value": "951b09434b6674c0ea5d2b20512ce008513f05b02dfe66f54e81ecc0ca134801181b638e8c0d9dcf1d2568a37247c5d8"
+    },
+    "verification": {
+      "result": "test-only",
+      "note": "Not verified: generated from a dummy report for workflow testing."
+    }
+  }
+}

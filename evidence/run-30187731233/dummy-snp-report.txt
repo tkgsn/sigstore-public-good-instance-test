@@ -1,0 +1,2 @@
+TEST ONLY: this is not a genuine AMD SEV-SNP attestation report.
+It exists only to exercise the signed measurement data flow.

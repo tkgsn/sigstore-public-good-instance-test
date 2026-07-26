@@ -18,6 +18,8 @@
       --accent-text: #0550ae;
       --success: #1a7f37;
       --success-soft: #dafbe1;
+      --warning: #9a6700;
+      --warning-soft: #fff8c5;
       --code: #f2f4f7;
       --shadow: 0 8px 28px rgba(31, 35, 40, 0.08);
     }
@@ -35,6 +37,8 @@
         --accent-text: #79c0ff;
         --success: #3fb950;
         --success-soft: #163522;
+        --warning: #d29922;
+        --warning-soft: #3b2e0a;
         --code: #0d1117;
         --shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
       }
@@ -105,7 +109,7 @@
 
     .flow {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 22px;
       align-items: stretch;
     }
@@ -135,6 +139,8 @@
     }
 
     .flow.verify .step:nth-child(3)::after { content: none; }
+    .flow:not(.verify) .step:nth-child(3)::after,
+    .flow:not(.verify) .step:nth-child(6)::after { content: none; }
 
     .number {
       display: inline-grid;
@@ -161,7 +167,7 @@
 
     .evidence-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -231,6 +237,15 @@
       color: var(--text);
     }
 
+    .warning {
+      margin: 0 0 22px;
+      padding: 14px 16px;
+      border: 1px solid var(--warning);
+      border-radius: 8px;
+      background: var(--warning-soft);
+      color: var(--text);
+    }
+
     .links { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 28px; }
 
     @media (max-width: 900px) {
@@ -254,7 +269,7 @@
   <main>
     <header>
       <h1>Rekor v2 Append &amp; Verify</h1>
-      <p class="lead">GitHub Actionsが署名対象をRekor v2へappendし、検証者がbundleから署名者・時刻・Merkle treeへの包含を確認する流れ。</p>
+      <p class="lead">GitHub Actionsが仮SNP measurementを含む署名対象をRekor v2へappendし、検証者がデータの整合性・署名者・時刻・Merkle treeへの包含を確認する流れ。</p>
     </header>
 
     <div class="tabs" role="tablist" aria-label="表示するフロー">
@@ -263,66 +278,74 @@
     </div>
 
     <section class="panel" id="append-panel" role="tabpanel" aria-labelledby="append-tab">
+      <p class="warning"><strong>TEST ONLY:</strong> 今回のmeasurementは実際のAMD SEV-SNP reportから取得した値ではありません。仮reportのSHA-384を使い、subjectにも<code>placeholder</code> / <code>test-only</code>と明記しています。</p>
       <div class="flow" aria-label="Rekor v2へのappendフロー">
         <article class="step">
           <span class="number">1</span>
-          <h3>Subjectを作る</h3>
-          <p>commit・workflow・run IDを含むJSONを署名対象として生成する。</p>
+          <h3>仮measurementを作る</h3>
+          <p><code>dummy-snp-report.txt</code>のSHA-256とSHA-384を計算する。後者を仮measurementとして使う。</p>
           <span class="actor">GITHUB ACTIONS</span>
         </article>
         <article class="step">
           <span class="number">2</span>
+          <h3>Subjectへ格納する</h3>
+          <p>commit・run IDとともに、値を<code>snp.measurement</code>へ格納し、<code>test-only</code>であることも署名対象に含める。</p>
+          <span class="actor">GITHUB ACTIONS</span>
+        </article>
+        <article class="step">
+          <span class="number">3</span>
           <h3>身元と鍵を結ぶ</h3>
           <p>GitHub OIDCをFulcioが確認し、一時公開鍵とworkflow identityを結ぶ短期証明書を発行する。</p>
           <span class="actor">FULCIO</span>
         </article>
         <article class="step">
-          <span class="number">3</span>
+          <span class="number">4</span>
           <h3>Hashを署名する</h3>
-          <p>SubjectのSHA-256を一時秘密鍵でECDSA署名し、TSAからRFC 3161 timestampを取得する。</p>
+          <p>SNPフィールドを含むSubject全体のSHA-256をECDSA署名し、TSAからRFC 3161 timestampを取得する。</p>
           <span class="actor">COSIGN + TSA</span>
         </article>
         <article class="step">
-          <span class="number">4</span>
+          <span class="number">5</span>
           <h3>Entryを提出する</h3>
-          <p>digest・signature・Fulcio certificateを<code>hashedrekord 0.0.2</code>として提出する。</p>
-          <span class="actor">COSIGN → REKOR</span>
+          <p>Subject本体ではなく、digest・signature・Fulcio certificateを<code>hashedrekord 0.0.2</code>として提出する。</p>
+          <span class="actor">COSIGN → REKOR V2</span>
         </article>
         <article class="step">
-          <span class="number">5</span>
+          <span class="number">6</span>
           <h3>Merkle treeへappend</h3>
-          <p>Entryを追記し、log index・audit path・root hash・signed checkpointを返す。</p>
+          <p>Entryを追記し、log index・audit path・root hash・signed checkpointをbundleへ返す。</p>
           <span class="actor">REKOR V2</span>
         </article>
       </div>
     </section>
 
     <section class="panel" id="verify-panel" role="tabpanel" aria-labelledby="verify-tab" hidden>
+      <p class="warning"><strong>検証範囲:</strong> 仮reportとsigned subjectの値が一致することは検証しますが、AMD証明書・SNP report署名・TCB・nonceなどのattestation検証は行っていません。</p>
       <div class="flow verify" aria-label="Rekor v2 bundleのverifyフロー">
         <article class="step">
           <span class="number">1</span>
-          <h3>Subject digest</h3>
-          <p>手元のsubjectをSHA-256化し、bundleの<code>messageDigest</code>と一致するか確認する。</p>
+          <h3>Placeholder data</h3>
+          <p>仮reportのSHA-256／SHA-384を再計算し、signed subjectの値と<code>placeholder</code>表示を確認する。</p>
         </article>
         <article class="step">
           <span class="number">2</span>
+          <h3>Subject digest</h3>
+          <p>subjectをSHA-256化し、bundleの<code>messageDigest</code>と一致するか確認する。</p>
+        </article>
+        <article class="step">
+          <span class="number">3</span>
           <h3>Identity &amp; signature</h3>
           <p>Fulcio chainとGitHub workflow identityを検証し、証明書の公開鍵でECDSA署名を確認する。</p>
         </article>
         <article class="step">
-          <span class="number">3</span>
+          <span class="number">4</span>
           <h3>Trusted time</h3>
           <p>RFC 3161 tokenをTSA trust rootで検証し、署名がFulcio証明書の有効期間内に存在したことを確認する。</p>
         </article>
         <article class="step">
-          <span class="number">4</span>
-          <h3>Leaf hash</h3>
-          <p><code>SHA256(0x00 || canonicalizedBody)</code>でRekor entryのleaf hashを再計算する。</p>
-        </article>
-        <article class="step">
           <span class="number">5</span>
           <h3>Inclusion proof</h3>
-          <p>20個のaudit-path hashを順に合成し、checkpointに記載されたroot hashへ到達することを確認する。</p>
+          <p>leaf hashと17個のaudit-path hashを合成し、checkpointに記載されたroot hashへ到達することを確認する。</p>
         </article>
         <article class="step">
           <span class="number">6</span>
@@ -332,12 +355,17 @@
       </div>
     </section>
 
-    <h2>3つのファイルの関係</h2>
+    <h2>4つのダウンロードファイルの関係</h2>
     <div class="evidence-grid">
+      <article class="evidence">
+        <h3>dummy-snp-report.txt</h3>
+        <p>仮measurementの導出元。テスト用テキストであり、実際のSNP attestation reportではない。</p>
+        <code class="value">SHA-384 → snp.measurement.value</code>
+      </article>
       <article class="evidence">
         <h3>rekor-v2-test-subject.json</h3>
         <p>署名対象の元データ。Rekorには本体ではなく、このファイルのdigestが登録される。</p>
-        <code class="value">SHA-256: nQWxW5dcj0y4KatMK/Jy1rCfntcv3f2IZtCMeJcIc9U=</code>
+        <code class="value">SHA-256: F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI=</code>
       </article>
       <article class="evidence">
         <h3>rekor-v2-test.sigstore.json</h3>
@@ -351,13 +379,26 @@
       </article>
     </div>
 
+    <h2>Signed subjectに入った仮measurement</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>実際に署名された値</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>mode</td><td><code>placeholder</code></td><td>実測SNP値ではないことを明示。</td></tr>
+          <tr><td>reportSha256</td><td><code>cf0dd6d26c8a9be7e156532b1a0c684ee8e4bd1a6595ce031ef936577319c741</code></td><td>ダウンロードした仮reportのSHA-256と一致。</td></tr>
+          <tr><td>measurement</td><td><code>sha384: 951b09434b6674c0ea5d2b20512ce008513f05b02dfe66f54e81ecc0ca134801181b638e8c0d9dcf1d2568a37247c5d8</code></td><td>仮reportのSHA-384。データフロー確認用。</td></tr>
+          <tr><td>verification.result</td><td><code>test-only</code></td><td>AMD SEV-SNP attestationとして未検証。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <h2>Rekor v2 entryの中身</h2>
     <div class="table-wrap">
       <table>
         <thead><tr><th>フィールド</th><th>今回の値</th><th>役割</th></tr></thead>
         <tbody>
-          <tr><td>digest</td><td><code>nQWxW5dcj0y4KatMK/Jy1rCfntcv3f2IZtCMeJcIc9U=</code></td><td>SubjectのSHA-256。Subject本体はRekorへ送らない。</td></tr>
-          <tr><td>signature</td><td><code>MEUCIQDBCNunbYfb…</code></td><td>一時秘密鍵によるdigestのECDSA署名。</td></tr>
+          <tr><td>digest</td><td><code>F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI=</code></td><td>SNPフィールドを含むSubject全体のSHA-256。Subject本体はRekorへ送らない。</td></tr>
+          <tr><td>signature</td><td><code>MEUCIQDYKEHc2pNR…</code></td><td>一時秘密鍵によるdigestのECDSA署名。</td></tr>
           <tr><td>certificate</td><td><code>PKIX ECDSA P-256</code></td><td>公開鍵とGitHub workflow identityを結び付けるFulcio証明書。</td></tr>
           <tr><td>kind / version</td><td><code>hashedrekord / 0.0.2</code></td><td>Rekor v2のcanonical entry形式。</td></tr>
         </tbody>
@@ -366,17 +407,19 @@
 
     <h2>実行結果</h2>
     <div class="result">
-      <div class="metric"><span>Log index</span><strong>40335848</strong></div>
-      <div class="metric"><span>Checkpoint tree size</span><strong>40335875</strong></div>
-      <div class="metric"><span>Root hash</span><strong><code>mBopqZh02Z4I…</code></strong></div>
+      <div class="metric"><span>Log index</span><strong>40472493</strong></div>
+      <div class="metric"><span>Checkpoint tree size</span><strong>40472501</strong></div>
+      <div class="metric"><span>Root hash</span><strong><code>beomKhVwk6Aj…</code></strong></div>
       <div class="metric"><span>検証結果</span><strong class="valid">Valid</strong></div>
     </div>
-    <p class="note">RFC 3161 timestampは2026-07-26 01:42:18 UTC（10:42:18 JST）。署名データがFulcio証明書の有効期間内に存在したことを証明する。</p>
+    <p class="note">run 30187731233を実検証済み。仮reportとのhash一致、Cosign bundle、17個のaudit pathによるinclusion proof、root hash、checkpoint署名がすべてValid。RFC 3161 timestampは2026-07-26 04:24:40 UTC（13:24:40 JST）。</p>
 
     <nav class="links" aria-label="関連資料">
       <a href="verification.md">詳細な検証手順</a>
       <a href="append.md">Cosign CLIを使った理由</a>
-      <a href="../evidence/run-30183326061/rekor-v2-test.sigstore.json">実際のSigstore bundle</a>
+      <a href="../evidence/run-30187731233/rekor-v2-test-subject.json">実際のsigned subject</a>
+      <a href="../evidence/run-30187731233/dummy-snp-report.txt">実際の仮report</a>
+      <a href="../evidence/run-30187731233/rekor-v2-test.sigstore.json">実際のSigstore bundle</a>
       <a href="../.github/workflows/rekor-v2.yml">GitHub Actions workflow</a>
     </nav>
   </main>
