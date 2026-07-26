@@ -2,11 +2,6 @@ name: Rekor v2 public-good test
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - .rekor-v2-trigger
 
 permissions: {}
 
