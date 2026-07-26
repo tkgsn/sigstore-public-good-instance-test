@@ -36,3 +36,9 @@ The workflow is manual only. Running it creates a permanent public transparency
 log entry. The repository name, workflow identity, artifact digest, certificate,
 and timestamp become public; the artifact contents themselves are not uploaded
 to Rekor.
+
+## Verify downloaded evidence
+
+See [docs/verification.md](docs/verification.md) for GitHub authentication and
+artifact-download instructions, independent inclusion-proof/root-hash
+verification, and the verified results from run `30183326061`.
