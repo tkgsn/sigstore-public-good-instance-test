@@ -21,7 +21,30 @@ jobs:
         with:
           cosign-release: v3.1.2
 
+      - name: Create placeholder SNP evidence
+        id: snp
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          printf '%s\n' \
+            'TEST ONLY: this is not a genuine AMD SEV-SNP attestation report.' \
+            'It exists only to exercise the signed measurement data flow.' \
+            > dummy-snp-report.txt
+
+          report_sha256="$(sha256sum dummy-snp-report.txt | cut -d' ' -f1)"
+          measurement="$(sha384sum dummy-snp-report.txt | cut -d' ' -f1)"
+
+          [[ "${report_sha256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${measurement}" =~ ^[0-9a-f]{96}$ ]]
+
+          echo "report_sha256=${report_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "measurement=${measurement}" >> "${GITHUB_OUTPUT}"
+
       - name: Create test subject
+        env:
+          SNP_REPORT_SHA256: ${{ steps.snp.outputs.report_sha256 }}
+          SNP_MEASUREMENT: ${{ steps.snp.outputs.measurement }}
         run: |
           jq -n \
             --arg repository "${GITHUB_REPOSITORY}" \
@@ -29,14 +52,45 @@ jobs:
             --arg workflow_ref "${GITHUB_WORKFLOW_REF}" \
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
+            --arg report_sha256 "${SNP_REPORT_SHA256}" \
+            --arg measurement "${SNP_MEASUREMENT}" \
             '{
-              purpose: "Rekor v2 public-good instance test",
+              purpose: "Rekor v2 placeholder SNP measurement test",
               repository: $repository,
               commit: $commit,
               workflowRef: $workflow_ref,
               runId: $run_id,
-              runAttempt: $run_attempt
+              runAttempt: $run_attempt,
+              snp: {
+                mode: "placeholder",
+                reportSha256: $report_sha256,
+                measurement: {
+                  algorithm: "sha384",
+                  value: $measurement
+                },
+                verification: {
+                  result: "test-only",
+                  note: "Not verified: generated from a dummy report for workflow testing."
+                }
+              }
             }' > rekor-v2-test-subject.json
+
+      - name: Verify placeholder measurement is in the subject
+        env:
+          SNP_REPORT_SHA256: ${{ steps.snp.outputs.report_sha256 }}
+          SNP_MEASUREMENT: ${{ steps.snp.outputs.measurement }}
+        run: |
+          jq -e \
+            --arg report_sha256 "${SNP_REPORT_SHA256}" \
+            --arg measurement "${SNP_MEASUREMENT}" \
+            '
+              .snp.mode == "placeholder" and
+              .snp.reportSha256 == $report_sha256 and
+              .snp.measurement.algorithm == "sha384" and
+              .snp.measurement.value == $measurement and
+              (.snp.measurement.value | test("^[0-9a-f]{96}$")) and
+              .snp.verification.result == "test-only"
+            ' rekor-v2-test-subject.json
 
       - name: Load the TUF-distributed Rekor v2 signing configuration
         run: |
@@ -91,5 +145,6 @@ jobs:
             rekor-v2-test-subject.json
             rekor-v2-test.sigstore.json
             signing-config.json
+            dummy-snp-report.txt
           if-no-files-found: error
           retention-days: 30
