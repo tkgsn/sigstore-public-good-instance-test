@@ -664,6 +664,38 @@
   }
 }</pre>
       </details>
+      <details class="file-viewer">
+        <summary>登録された Rekor v2 entryの中身</summary>
+        <pre>{
+  "logIndex": "40472493",
+  "logId": "zxGZFVvd0FEmjR8WrFwMdcAJ9vtaY/QXf44Y1wUeP6A=",
+  "kindVersion": {
+    "kind": "hashedrekord",
+    "version": "0.0.2"
+  },
+  "canonicalizedBody": {
+    "apiVersion": "0.0.2",
+    "kind": "hashedrekord",
+    "spec": {
+      "hashedRekordV002": {
+        "data": {
+          "algorithm": "SHA2_256",
+          "digest": "F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI="
+        },
+        "signature": {
+          "content": "MEUCIQDYKEHc2pNRDSYlpnGguTODPqzPDO3hcwTnSs+3xZStXAIgWJ+wCSNC5m+YzfGThrJlAR+Bkwct9MmusprHHWh/fx0=",
+          "verifier": {
+            "keyDetails": "PKIX_ECDSA_P256_SHA_256",
+            "x509Certificate": {
+              "rawBytes": "MIIHwTCCB0egAwIBAgIU...（bundle内のcertificate.rawBytesと同じ）"
+            }
+          }
+        }
+      }
+    }
+  }
+}</pre>
+      </details>
     </div>
 
     <nav class="links" aria-label="関連資料">
@@ -677,6 +709,13 @@
   <script>
     const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
     const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+    const appendFileViewers = document.querySelector('.file-viewers');
+    const appendPanel = document.getElementById('append-panel');
+
+    // The file viewers belong to the Append tab, even though their large
+    // embedded JSON is kept near the end of this document for readability.
+    appendPanel.append(appendFileViewers);
+    appendFileViewers.hidden = false;
 
     function selectTab(selected) {
       tabs.forEach((tab) => {
@@ -684,6 +723,9 @@
         tab.setAttribute('aria-selected', String(active));
         document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
       });
+      // Keep the embedded JSON viewers strictly Append-only even if a browser
+      // retains their original position while reloading the document.
+      appendFileViewers.hidden = selected.id !== 'append-tab';
     }
 
     tabs.forEach((tab, index) => {
@@ -697,6 +739,8 @@
         selectTab(next);
       });
     });
+
+    selectTab(document.getElementById('append-tab'));
 
   </script>
 </body>
