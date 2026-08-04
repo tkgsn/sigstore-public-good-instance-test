@@ -140,7 +140,7 @@
 
     .flow.verify .step:nth-child(3)::after { content: none; }
     .flow:not(.verify) .step:nth-child(3)::after,
-    .flow:not(.verify) .step:nth-child(6)::after { content: none; }
+    .flow:not(.verify) .step:nth-child(5)::after { content: none; }
 
     .number {
       display: inline-grid;
@@ -165,10 +165,54 @@
       letter-spacing: 0.03em;
     }
 
-    .evidence-grid {
+    .workflow-shell {
+      margin: 22px 0;
+      padding: 18px;
+      border: 2px solid var(--accent);
+      border-radius: 12px;
+      background: var(--accent-soft);
+    }
+
+    .workflow-shell > h2 { margin: 0; color: var(--accent-text); font-size: 1.08rem; }
+    .workflow-shell > p { margin: 7px 0 18px; color: var(--muted); font-size: 0.9rem; }
+
+    .io-card {
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .io-card h2 { margin: 4px 0 6px; font-size: 1rem; }
+    .io-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .io-label { color: var(--accent-text); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; }
+
+    .io-card ul { margin: 8px 0 0; padding-left: 1.3rem; color: var(--muted); font-size: 0.9rem; }
+    .io-card li + li { margin-top: 4px; }
+
+    .io-arrow {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      height: 34px;
+      place-items: center;
+      color: var(--accent);
+      font-size: 1.55rem;
+      line-height: 1;
+    }
+
+    .pinned-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
+    }
+
+    .trust-chain {
+      margin: 14px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--code);
+      white-space: pre-wrap;
+      font: 0.88rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
     .evidence {
@@ -257,21 +301,6 @@
     th { color: var(--muted); font-weight: 500; }
     td:first-child { white-space: nowrap; font-weight: 500; }
 
-    .result {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--border);
-    }
-
-    .metric { padding: 16px; background: var(--surface); }
-    .metric span { display: block; color: var(--muted); font-size: 0.78rem; }
-    .metric strong { display: block; margin-top: 5px; font-weight: 500; overflow-wrap: anywhere; }
-    .valid { color: var(--success); }
-
     .note {
       margin-top: 18px;
       padding: 14px 16px;
@@ -295,13 +324,11 @@
     @media (max-width: 900px) {
       .flow, .flow.verify { grid-template-columns: 1fr 1fr; }
       .step:not(:last-child)::after { content: none; }
-      .evidence-grid { grid-template-columns: 1fr; }
-      .result { grid-template-columns: 1fr 1fr; }
     }
 
     @media (max-width: 560px) {
       main { width: min(100% - 22px, 1120px); padding-top: 28px; }
-      .flow, .flow.verify, .result { grid-template-columns: 1fr; }
+      .flow, .flow.verify, .pinned-grid { grid-template-columns: 1fr; }
       .tabs { display: flex; width: 100%; }
       .tab { flex: 1; }
       .step { min-height: 0; }
@@ -313,7 +340,7 @@
   <main>
     <header>
       <h1>Rekor v2 Append &amp; Verify</h1>
-      <p class="lead">GitHub Actionsが仮SNP measurementを含む署名対象をRekor v2へappendし、検証者がデータの整合性・署名者・時刻・Merkle treeへの包含を確認する流れ。</p>
+      <p class="lead">GitHub Actionsが任意のJSONをRekor v2へappendし、検証者がデータの整合性・署名者・時刻・Merkle treeへの包含を確認する流れ。</p>
     </header>
 
     <div class="tabs" role="tablist" aria-label="表示するフロー">
@@ -322,138 +349,258 @@
     </div>
 
     <section class="panel" id="append-panel" role="tabpanel" aria-labelledby="append-tab">
-      <p class="warning"><strong>TEST ONLY:</strong> 今回のmeasurementは実際のAMD SEV-SNP reportから取得した値ではありません。仮reportのSHA-384を使い、subjectにも<code>placeholder</code> / <code>test-only</code>と明記しています。</p>
-      <div class="flow" aria-label="Rekor v2へのappendフロー">
-        <article class="step">
-          <span class="number">1</span>
-          <h3>仮measurementを作る</h3>
-          <p><code>dummy-snp-report.txt</code>のSHA-256とSHA-384を計算する。後者を仮measurementとして使う。</p>
-          <span class="actor">GITHUB ACTIONS</span>
-        </article>
-        <article class="step">
-          <span class="number">2</span>
-          <h3>Subjectへ格納する</h3>
-          <p>commit・run IDとともに、値を<code>snp.measurement</code>へ格納し、<code>test-only</code>であることも署名対象に含める。</p>
-          <span class="actor">GITHUB ACTIONS</span>
-        </article>
-        <article class="step">
-          <span class="number">3</span>
-          <h3>身元と鍵を結ぶ</h3>
-          <p>GitHub OIDCをFulcioが確認し、一時公開鍵とworkflow identityを結ぶ短期証明書を発行する。</p>
-          <span class="actor">FULCIO</span>
-        </article>
-        <article class="step">
-          <span class="number">4</span>
-          <h3>Hashを署名する</h3>
-          <p>SNPフィールドを含むSubject全体のSHA-256をECDSA署名し、TSAからRFC 3161 timestampを取得する。</p>
-          <span class="actor">COSIGN + TSA</span>
-        </article>
-        <article class="step">
-          <span class="number">5</span>
-          <h3>Entryを提出する</h3>
-          <p>Subject本体ではなく、digest・signature・Fulcio certificateを<code>hashedrekord 0.0.2</code>として提出する。</p>
-          <span class="actor">COSIGN → REKOR V2</span>
-        </article>
-        <article class="step">
-          <span class="number">6</span>
-          <h3>Merkle treeへappend</h3>
-          <p>Entryを追記し、log index・audit path・root hash・signed checkpointをbundleへ返す。</p>
-          <span class="actor">REKOR V2</span>
-        </article>
-      </div>
+      <article class="io-card" aria-label="Append入力">
+        <span class="io-label">INPUT</span>
+        <h2>rekor-v2-test-subject.json</h2>
+        <p>署名・Rekor登録の対象となるsubject。RekorにはJSON本体ではなく、そのdigestに結び付いた署名材料を送る。</p>
+        <code class="value">rekor-v2-test-subject.json の digest (SHA-256, base64): F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI=</code>
+      </article>
+      <div class="io-arrow" aria-hidden="true">↓</div>
+      <section class="workflow-shell" aria-labelledby="workflow-title">
+        <h2 id="workflow-title">GitHub Actions workflow（runner上の Cosign）</h2>
+        <p>workflow が以下の処理を実行する。Fulcio、TSA、Rekor は workflow の外部サービスである。</p>
+        <div class="flow" aria-label="Rekor v2へのappendフロー">
+          <article class="step">
+            <span class="number">1</span>
+            <h3>身元と鍵を結ぶ</h3>
+            <p>GitHub OIDCをFulcioが確認し、一時公開鍵とworkflow identity（今回は<a href="https://github.com/tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main">https://github.com/tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main</a>）を結ぶ短期証明書を発行する。</p>
+            <span class="actor">COSIGN → FULCIO</span>
+          </article>
+          <article class="step">
+            <span class="number">2</span>
+            <h3>Hashを署名する</h3>
+            <p>Subject全体のSHA-256をECDSA署名し、TSAからRFC 3161 timestampを取得する。</p>
+            <span class="actor">COSIGN + TSA</span>
+          </article>
+          <article class="step">
+            <span class="number">3</span>
+            <h3>Entryを提出する</h3>
+            <p>Subject本体ではなく、digest・signature・Fulcio certificateを<code>hashedrekord 0.0.2</code>（Rekorのscheme）として提出する。</p>
+            <span class="actor">COSIGN → REKOR V2</span>
+          </article>
+          <article class="step">
+            <span class="number">4</span>
+            <h3>Merkle treeへappend</h3>
+            <p>Rekorがentryを追記し、log index・audit path・root hash・signed checkpointを返す。</p>
+            <span class="actor">REKOR V2</span>
+          </article>
+          <article class="step">
+            <span class="number">5</span>
+            <h3>証拠をbundle化する</h3>
+            <p>Cosignが署名、Fulcio証明書、timestamp、Rekor証跡をひとつのbundleへまとめる。</p>
+            <span class="actor">COSIGN</span>
+          </article>
+        </div>
+      </section>
+      <div class="io-arrow" aria-hidden="true">↓</div>
+      <article class="io-card" aria-label="Append出力">
+        <span class="io-label">OUTPUT (GitHub Actions artifact)</span>
+        <h2>rekor-v2-test.sigstore.json</h2>
+        <p>subjectの署名、Fulcio証明書、timestamp、Rekor InclusionProof、signed checkpointを含む検証bundle。</p>
+      </article>
     </section>
 
     <section class="panel" id="verify-panel" role="tabpanel" aria-labelledby="verify-tab" hidden>
-      <p class="warning"><strong>検証範囲:</strong> 仮reportとsigned subjectの値が一致することは検証しますが、AMD証明書・SNP report署名・TCB・nonceなどのattestation検証は行っていません。</p>
-      <div class="flow verify" aria-label="Rekor v2 bundleのverifyフロー">
+      <section class="pinned-values" aria-labelledby="pinned-values-title">
+        <h2 id="pinned-values-title">Client 固定値</h2>
+        <p>Sigstoreの更新可能な信頼設定は、本来は次のTUF信頼連鎖で配布・検証される。</p>
+        <div class="trust-chain">固定 TUF root
+  → TUF metadata
+    → TrustedRoot
+      → Fulcio root CA
+      → Rekor checkpoint 公開鍵
+      → Sigstore timestamp root CA</div>
+        <p>client appではTUFを実装・オンライン更新せず、Fulcio root CA、Rekor checkpoint公開鍵、Sigstore timestamp root CAをアプリに固定する。現時点では滅多に更新されていないが、これらの鍵が更新された場合にappの更新が必要。</p>
+        <div class="pinned-grid">
+          <article class="evidence">
+            <h3>Fulcio root CA</h3>
+            <p>Fulcio leaf certificate の chain 検証の trust anchor。</p>
+            <a href="../trust/fulcio-root-ca.pem">fulcio-root-ca.pem</a>
+            <code class="value">SHA-256: 3B:A7:B6:CC:4E:95:46:9D:4D:33:4B:49:CB:25:7A:D8:53:70:76:FA:84:B0:CA:87:FF:4E:CF:E6:A5:46:80:C1</code>
+          </article>
+          <article class="evidence">
+            <h3>Rekor v2 checkpoint 公開鍵</h3>
+            <p><code>log2025-1.rekor.sigstore.dev</code> の C2SP checkpoint 署名を検証する Ed25519 鍵。</p>
+            <a href="../trust/rekor-v2-log2025-1-checkpoint.pub">rekor-v2-log2025-1-checkpoint.pub</a>
+            <code class="value">logId: zxGZFVvd0FEmjR8WrFwMdcAJ9vtaY/QXf44Y1wUeP6A=</code>
+          </article>
+          <article class="evidence">
+            <h3>Sigstore timestamp root CA</h3>
+            <p>RFC 3161 timestamp の署名を検証する trust anchor。</p>
+            <a href="../trust/sigstore-timestamp-root-ca.pem">sigstore-timestamp-root-ca.pem</a>
+            <code class="value">SHA-256: 2A:CA:8F:EA:5D:3C:E4:8B:01:CC:77:07:62:93:C2:80:E6:C2:3F:FE:44:03:47:57:EE:78:33:CA:9F:45:D6:33</code>
+          </article>
+          <article class="evidence">
+            <h3>Allowed repository owner</h3>
+            <p>Fulcio leaf certificate の GitHub Actions identity に含まれる repository owner を照合する。</p>
+            <code class="value">tkgsn</code>
+          </article>
+        </div>
+      </section>
+      <h2>Verify workflow</h2>
+      <article class="io-card" aria-label="Verify入力">
+        <span class="io-label">INPUT</span>
+        <h2>Verify input</h2>
+        <ul>
+          <li><code>rekor-v2-test-subject.json</code></li>
+          <li><code>rekor-v2-test.sigstore.json</code></li>
+          <li>Fulcio intermediate certificate</li>
+          <li>TSA intermediate / signer certificate</li>
+        </ul>
+      </article>
+      <div class="io-arrow" aria-hidden="true">↓</div>
+      <section class="workflow-shell" aria-labelledby="client-workflow-title">
+        <h2 id="client-workflow-title">Client workflow</h2>
+        <p>client 固定値と上記の入力を用いて、bundle の署名・時刻・Rekor inclusion を検証する。</p>
+        <div class="flow verify" aria-label="Rekor v2 bundleのverifyフロー">
         <article class="step">
           <span class="number">1</span>
-          <h3>Placeholder data</h3>
-          <p>仮reportのSHA-256／SHA-384を再計算し、signed subjectの値と<code>placeholder</code>表示を確認する。</p>
+          <h3>Subject digest</h3>
+          <p><code>rekor-v2-test-subject.json</code>をSHA-256化し、<code>rekor-v2-test.sigstore.json</code>の<code>messageSignature.messageDigest.digest</code>と一致するか確認する。</p>
         </article>
         <article class="step">
           <span class="number">2</span>
-          <h3>Subject digest</h3>
-          <p>subjectをSHA-256化し、bundleの<code>messageDigest</code>と一致するか確認する。</p>
+          <h3>Identity &amp; signature</h3>
+          <p>Fulcio intermediate certificateを用いて、Fulcio leaf証明書がclient固定のFulcio root CAまで正しくchain検証できることを確認する。GitHub workflow identityに含まれるrepository ownerがclient固定値の<code>tkgsn</code>と一致するかを確認し、証明書の公開鍵でECDSA signatureを検証する。</p>
         </article>
         <article class="step">
           <span class="number">3</span>
-          <h3>Identity &amp; signature</h3>
-          <p>Fulcio chainとGitHub workflow identityを検証し、証明書の公開鍵でECDSA署名を確認する。</p>
-        </article>
-        <article class="step">
-          <span class="number">4</span>
           <h3>Trusted time</h3>
           <p>RFC 3161 tokenをTSA trust rootで検証し、署名がFulcio証明書の有効期間内に存在したことを確認する。</p>
         </article>
         <article class="step">
-          <span class="number">5</span>
+          <span class="number">4</span>
           <h3>Inclusion proof</h3>
           <p>leaf hashと17個のaudit-path hashを合成し、checkpointに記載されたroot hashへ到達することを確認する。</p>
         </article>
         <article class="step">
-          <span class="number">6</span>
+          <span class="number">5</span>
           <h3>Signed checkpoint</h3>
-          <p>TUF TrustedRootのRekor Ed25519鍵でcheckpoint署名を検証し、root hashを信頼できる状態にする。</p>
+          <p>上記のclient固定値であるRekor v2 checkpoint公開鍵で署名を検証し、root hashを信頼できる状態にする。<code>logId</code>とoriginも固定値と照合する。</p>
         </article>
-      </div>
+        </div>
+      </section>
+      <div class="io-arrow" aria-hidden="true">↓</div>
+      <article class="io-card" aria-label="Verify出力">
+        <span class="io-label">OUTPUT</span>
+        <h2>Verify result</h2>
+        <ul>
+          <li><code>Rekor inclusion: valid</code></li>
+          <li><code>Repository owner: valid</code></li>
+        </ul>
+      </article>
     </section>
 
-    <h2>4つのダウンロードファイルの関係</h2>
-    <div class="evidence-grid">
-      <article class="evidence">
-        <h3>dummy-snp-report.txt</h3>
-        <p>仮measurementの導出元。テスト用テキストであり、実際のSNP attestation reportではない。</p>
-        <code class="value">SHA-384 → snp.measurement.value</code>
-      </article>
-      <article class="evidence">
-        <h3>rekor-v2-test-subject.json</h3>
-        <p>署名対象の元データ。Rekorには本体ではなく、このファイルのdigestが登録される。</p>
-        <code class="value">SHA-256: F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI=</code>
-      </article>
-      <article class="evidence">
-        <h3>rekor-v2-test.sigstore.json</h3>
-        <p>署名・証明書・timestamp・Rekor entry・inclusion proof・checkpointをまとめた検証bundle。</p>
-        <code class="value">mediaType: sigstore.bundle.v0.3</code>
-      </article>
-      <article class="evidence">
-        <h3>signing-config.json</h3>
-        <p>Cosignが署名時に使ったサービス選択。v2 shardをTUF配布設定から選ぶ。</p>
-        <code class="value">log2025-1.rekor.sigstore.dev · API v2</code>
-      </article>
-    </div>
-
-    <div class="file-viewers" aria-label="ダウンロードファイルの内容">
-      <details class="file-viewer">
-        <summary>dummy-snp-report.txt の内容を表示</summary>
-        <pre>TEST ONLY: this is not a genuine AMD SEV-SNP attestation report.
-It exists only to exercise the signed measurement data flow.</pre>
-      </details>
+    <div class="file-viewers" aria-label="ダウンロードファイルの内容" hidden>
       <details class="file-viewer">
         <summary>rekor-v2-test-subject.json の内容を表示</summary>
         <pre>{
-  "purpose": "Rekor v2 placeholder SNP measurement test",
-  "repository": "tkgsn/sigstore-public-good-instance-test",
-  "commit": "ebc8552ffa6afc2fa4396a21615da315204c62ec",
-  "workflowRef": "tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main",
-  "runId": "30187731233",
-  "runAttempt": "1",
-  "snp": {
-    "mode": "placeholder",
-    "reportSha256": "cf0dd6d26c8a9be7e156532b1a0c684ee8e4bd1a6595ce031ef936577319c741",
-    "measurement": {
-      "algorithm": "sha384",
-      "value": "951b09434b6674c0ea5d2b20512ce008513f05b02dfe66f54e81ecc0ca134801181b638e8c0d9dcf1d2568a37247c5d8"
-    },
-    "verification": {
-      "result": "test-only",
-      "note": "Not verified: generated from a dummy report for workflow testing."
-    }
-  }
+  "measurement": "d2c7d4c3a4b3e6f5c8d7e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0"
 }</pre>
       </details>
       <details class="file-viewer">
         <summary>rekor-v2-test.sigstore.json の内容を表示</summary>
+        <details class="file-viewer">
+          <summary>certificate.rawBytes をDER/X.509としてデコードした結果を表示</summary>
+        <pre>Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            01:45:17:29:82:fe:b8:c1:07:da:f8:4e:38:68:ec:4d:b1:8d:82:91
+        Signature Algorithm: ecdsa-with-SHA384
+        Issuer: O=sigstore.dev, CN=sigstore-intermediate
+        Validity
+            Not Before: Jul 26 04:24:40 2026 GMT
+            Not After : Jul 26 04:34:40 2026 GMT
+        Subject:
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:54:3f:0b:8d:7a:bd:16:50:09:2d:a8:96:11:b3:
+                    54:75:68:3c:a6:46:80:73:41:e9:9e:6a:b4:37:32:
+                    59:f8:5a:94:e0:4b:2f:45:c7:05:c2:a4:9c:2b:ec:
+                    88:a1:dd:91:f6:01:c6:f2:77:75:7f:61:6e:fb:af:
+                    a0:d6:03:07:f7
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature
+            X509v3 Extended Key Usage:
+                Code Signing
+            X509v3 Subject Key Identifier:
+                8B:1E:45:46:99:1E:B6:DA:7B:E1:94:45:4E:83:4B:21:71:DA:93:19
+            X509v3 Authority Key Identifier:
+                DF:D3:E9:CF:56:24:11:96:F9:A8:D8:E9:28:55:A2:C6:2E:18:64:3F
+            X509v3 Subject Alternative Name: critical
+                URI:https://github.com/tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main
+            1.3.6.1.4.1.57264.1.1:
+                https://token.actions.githubusercontent.com
+            1.3.6.1.4.1.57264.1.2:
+                workflow_dispatch
+            1.3.6.1.4.1.57264.1.3:
+                ebc8552ffa6afc2fa4396a21615da315204c62ec
+            1.3.6.1.4.1.57264.1.4:
+                Rekor v2 public-good test
+            1.3.6.1.4.1.57264.1.5:
+                tkgsn/sigstore-public-good-instance-test
+            1.3.6.1.4.1.57264.1.6:
+                refs/heads/main
+            1.3.6.1.4.1.57264.1.8:
+                https://token.actions.githubusercontent.com
+            1.3.6.1.4.1.57264.1.9:
+                https://github.com/tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main
+            1.3.6.1.4.1.57264.1.10:
+                ebc8552ffa6afc2fa4396a21615da315204c62ec
+            1.3.6.1.4.1.57264.1.11:
+                github-hosted
+            1.3.6.1.4.1.57264.1.12:
+                https://github.com/tkgsn/sigstore-public-good-instance-test
+            1.3.6.1.4.1.57264.1.13:
+                ebc8552ffa6afc2fa4396a21615da315204c62ec
+            1.3.6.1.4.1.57264.1.14:
+                refs/heads/main
+            1.3.6.1.4.1.57264.1.15:
+                1312410740
+            1.3.6.1.4.1.57264.1.16:
+                https://github.com/tkgsn
+            1.3.6.1.4.1.57264.1.17:
+                47246876
+            1.3.6.1.4.1.57264.1.18:
+                https://github.com/tkgsn/sigstore-public-good-instance-test/.github/workflows/rekor-v2.yml@refs/heads/main
+            1.3.6.1.4.1.57264.1.19:
+                ebc8552ffa6afc2fa4396a21615da315204c62ec
+            1.3.6.1.4.1.57264.1.20:
+                workflow_dispatch
+            1.3.6.1.4.1.57264.1.21:
+                https://github.com/tkgsn/sigstore-public-good-instance-test/actions/runs/30187731233/attempts/1
+            1.3.6.1.4.1.57264.1.22:
+                public
+            1.3.6.1.4.1.57264.1.24:
+                repo:tkgsn@47246876/sigstore-public-good-instance-test@1312410740:ref:refs/heads/main
+            CT Precertificate SCTs:
+                Signed Certificate Timestamp:
+                    Version   : v1 (0x0)
+                    Log ID    : DD:3D:30:6A:C6:C7:11:32:63:19:1E:1C:99:67:37:02:
+                                A2:4A:5E:B8:DE:3C:AD:FF:87:8A:72:80:2F:29:EE:8E
+                    Timestamp : Jul 26 04:24:40.402 2026 GMT
+                    Extensions: none
+                    Signature : ecdsa-with-SHA256
+                                30:44:02:20:09:69:3D:D4:95:32:2B:AB:52:37:EA:7D:
+                                32:87:D6:0B:EF:CD:89:40:86:C8:90:4E:48:0A:F6:E7:
+                                A6:20:EB:06:02:20:1F:79:25:A2:3A:B9:2B:64:90:E4:
+                                19:14:42:FF:CA:FF:50:D1:6E:38:DC:3A:B6:B5:6C:36:
+                                DC:C8:2E:C6:E8:6B
+    Signature Algorithm: ecdsa-with-SHA384
+    Signature Value:
+        30:65:02:30:40:f2:bc:a0:2e:13:8d:3f:2f:c5:8c:cf:f8:6b:
+        1d:ef:7c:21:24:cb:ba:80:0e:4b:f5:a6:e1:b5:28:e0:14:32:
+        9b:12:93:34:5d:a9:ca:0d:a1:48:93:3b:80:ed:a9:be:02:31:
+        00:f7:a5:cd:11:76:c7:62:30:0c:45:7e:86:0f:f2:65:5a:26:
+        69:fe:f3:1c:bd:18:6d:72:10:4e:8e:87:11:91:33:8a:88:32:
+        73:da:60:1e:57:0f:12:2b:75:fc:2c:25:71</pre>
+        </details>
         <pre>{
   "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
   "verificationMaterial": {
@@ -517,110 +664,13 @@ It exists only to exercise the signed measurement data flow.</pre>
   }
 }</pre>
       </details>
-      <details class="file-viewer">
-        <summary>signing-config.json の内容を表示</summary>
-        <pre>{
-  "mediaType": "application/vnd.dev.sigstore.signingconfig.v0.2+json",
-  "caUrls": [
-    {
-      "url": "https://fulcio.sigstore.dev",
-      "majorApiVersion": 1,
-      "validFor": {
-        "start": "2022-04-13T20:06:15Z"
-      },
-      "operator": "sigstore.dev"
-    }
-  ],
-  "oidcUrls": [
-    {
-      "url": "https://oauth2.sigstore.dev/auth",
-      "majorApiVersion": 1,
-      "validFor": {
-        "start": "2022-04-13T20:06:15Z"
-      },
-      "operator": "sigstore.dev"
-    }
-  ],
-  "rekorTlogUrls": [
-    {
-      "url": "https://log2025-1.rekor.sigstore.dev",
-      "majorApiVersion": 2,
-      "validFor": {
-        "start": "2026-01-01T00:00:00Z"
-      },
-      "operator": "sigstore.dev"
-    },
-    {
-      "url": "https://rekor.sigstore.dev",
-      "majorApiVersion": 1,
-      "validFor": {
-        "start": "2021-01-12T11:53:27Z"
-      },
-      "operator": "sigstore.dev"
-    }
-  ],
-  "rekorTlogConfig": {
-    "selector": "ANY"
-  },
-  "tsaUrls": [
-    {
-      "url": "https://timestamp.sigstore.dev/api/v1/timestamp",
-      "majorApiVersion": 1,
-      "validFor": {
-        "start": "2025-07-04T00:00:00Z"
-      },
-      "operator": "sigstore.dev"
-    }
-  ],
-  "tsaConfig": {
-    "selector": "ANY"
-  }
-}</pre>
-      </details>
     </div>
-
-    <h2>Signed subjectに入った仮measurement</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>フィールド</th><th>実際に署名された値</th><th>意味</th></tr></thead>
-        <tbody>
-          <tr><td>mode</td><td><code>placeholder</code></td><td>実測SNP値ではないことを明示。</td></tr>
-          <tr><td>reportSha256</td><td><code>cf0dd6d26c8a9be7e156532b1a0c684ee8e4bd1a6595ce031ef936577319c741</code></td><td>ダウンロードした仮reportのSHA-256と一致。</td></tr>
-          <tr><td>measurement</td><td><code>sha384: 951b09434b6674c0ea5d2b20512ce008513f05b02dfe66f54e81ecc0ca134801181b638e8c0d9dcf1d2568a37247c5d8</code></td><td>仮reportのSHA-384。データフロー確認用。</td></tr>
-          <tr><td>verification.result</td><td><code>test-only</code></td><td>AMD SEV-SNP attestationとして未検証。</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2>Rekor v2 entryの中身</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>フィールド</th><th>今回の値</th><th>役割</th></tr></thead>
-        <tbody>
-          <tr><td>digest</td><td><code>F79C/73jpvhd28HLODuQckyKHru2BxZvnae/yZyD5hI=</code></td><td>SNPフィールドを含むSubject全体のSHA-256。Subject本体はRekorへ送らない。</td></tr>
-          <tr><td>signature</td><td><code>MEUCIQDYKEHc2pNR…</code></td><td>一時秘密鍵によるdigestのECDSA署名。</td></tr>
-          <tr><td>certificate</td><td><code>PKIX ECDSA P-256</code></td><td>公開鍵とGitHub workflow identityを結び付けるFulcio証明書。</td></tr>
-          <tr><td>kind / version</td><td><code>hashedrekord / 0.0.2</code></td><td>Rekor v2のcanonical entry形式。</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2>実行結果</h2>
-    <div class="result">
-      <div class="metric"><span>Log index</span><strong>40472493</strong></div>
-      <div class="metric"><span>Checkpoint tree size</span><strong>40472501</strong></div>
-      <div class="metric"><span>Root hash</span><strong><code>beomKhVwk6Aj…</code></strong></div>
-      <div class="metric"><span>検証結果</span><strong class="valid">Valid</strong></div>
-    </div>
-    <p class="note">run 30187731233を実検証済み。仮reportとのhash一致、Cosign bundle、17個のaudit pathによるinclusion proof、root hash、checkpoint署名がすべてValid。RFC 3161 timestampは2026-07-26 04:24:40 UTC（13:24:40 JST）。</p>
 
     <nav class="links" aria-label="関連資料">
       <a href="verification.md">詳細な検証手順</a>
       <a href="append.md">Cosign CLIを使った理由</a>
-      <a href="../evidence/run-30187731233/rekor-v2-test-subject.json">実際のsigned subject</a>
-      <a href="../evidence/run-30187731233/dummy-snp-report.txt">実際の仮report</a>
+      <a href="../.github/workflows/rekor-v2.yml">subjectを用意するWorkflow</a>
       <a href="../evidence/run-30187731233/rekor-v2-test.sigstore.json">実際のSigstore bundle</a>
-      <a href="../.github/workflows/rekor-v2.yml">GitHub Actions workflow</a>
     </nav>
   </main>
 
